@@ -38,7 +38,9 @@ const bool    VALID         = true;
 const bool    NOTVALID      = false;
 // where is hardware attached?
 const uint8_t BUTTON1_PIN  = 2;
-const uint8_t LIGHT1_PIN   = 3;
+// TODO temporary, for testing
+const uint8_t LIGHT1_PIN   = 13;
+// const uint8_t LIGHT1_PIN   = 3;
 const uint8_t SWITCH1_PIN  = 4;
 const uint8_t SWITCH2_PIN  = 5;
 const uint8_t LED0_PIN     = 6;
@@ -53,5 +55,14 @@ const uint8_t ADC_SPI1_PIN = A1;
 const uint8_t ADC_SPI2_PIN = A2;
 const uint8_t I2C_SDA_PIN  = A4;
 const uint8_t I2C_SCL_PIN  = A5;
+
+#define SET_PIN_HIGH(p) do { pinMode(p,OUTPUT); digitalWrite(p,HIGH); } while (0)
+#define SET_PIN_LOW(p)  do { pinMode(p,OUTPUT); digitalWrite(p,LOW);  } while (0)
+#define SET_PIN_HIZ(p)  do { pinMode(p,INPUT);  digitalWrite(p,LOW);  } while (0)
+#define SET_LED_PINS(a,b,c) do {\
+    SET_##a(LED0_PIN);\
+    SET_##b(LED1_PIN);\
+    SET_##c(LED2_PIN);\
+} while (0)
 
 #endif
