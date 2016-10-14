@@ -35,33 +35,25 @@
  *          SW2-Off   DRIVE-2   OFF
  *          SW2-On    DRIVE-1   *NOT*ALLOWED*
  *      Indicators: (charlieplexed)
- *          L0 ->    +     -     +     -
- *                  LED1  LED3   +     -
- *          L1 ->    -     +    LED5  LED6
- *                  LED2  LED4   -     +
- *          L2 ->    +     -     -     +
- *
- *          LED1 = L0-H L1-L L2-Z   H=High (Output High)
- *          LED2 = L0-Z L1-L L2-H   L=Low  (Output Low)
- *          LED3 = L0-L L1-H L2-Z   Z=Tri-state (Input)
- *          LED4 = L0-Z L1-H L2-L
- *          LED5 = L0-H L1-Z L2-L
- *          LED6 = L0-L L1-Z L2-H
+ *          LED1 - Digital Output D6
+ *          LED2 - Digital Output D7
+ *          LED3 - Digital Output D8
+ *          LED4 - Digital Output D9
  *
  *  For all Pots (Digital AD5206 or otherwise), Terminal B is ALWAYS
  *  ground, Terminal A is ALWAYS VCC (5VDC), Wiper W varies (0=B,255=A).
  *
  *  Pins used on Arduino Pro Mini (3.3v) or Nano (5.0v)
- *      A0  ADC SPI0 --- D2 IN  BUTTON1
- *      A1  ADC SPI1 --- D3 OUT LIGHT1
- *      A2  ADC SPI2 --- D4 OUT SW1
- *      A3  ?   ?    --- D5 OUT SW2
- *      A4  I2C SDA  --- D6 I/O L0
- *      A5  I2C SCL  --- D7 I/O L1
- *      D10 SPI SS   --- D8 I/O L2
- *      D11 SPI MOSI --- D9 ?   ?
- *      D12 SPI MISO --- D0 SER RX
- *      D13 SPI SCK  --- D1 SER TX
+ *      SPI0 AIN  A0 --- D2 DIN BUTTON1
+ *      SPI1 AIN  A1 --- D3 OUT LIGHT1
+ *      SPI2 AIN  A2 --- D4 OUT SW1
+ *      ?    ?    A3 --- D5 OUT SW2
+ *      SDA  I2C  A4 --- D6 OUT LED1
+ *      SCL  I2C  A5 --- D7 OUT LED2
+ *      SS   SPI D10 --- D8 OUT LED3
+ *      MOSI SPI D11 --- D9 OUT LED4
+ *      MISO SPI D12 --- D0 SER RX
+ *      SCK  SPI D13 --- D1 SER TX
  */
 
 #include "motion-control.h"
@@ -70,100 +62,88 @@ void setDefaultState()
 {
     // set power-on state of variables so interrupt routine will output good
     // values to hardware
-    SET_PIN_PULLUP(BUTTON1_PIN);
-    state.button1=false;
-    SET_PIN_LOW(LIGHT1_PIN);
-    state.light1=false;
-    // see logic chart above about switch1/switch2 defaults
-    SET_PIN_HIGH(SWITCH1_PIN);
-    state.switch1=true;
-    SET_PIN_LOW(SWITCH2_PIN);
-    state.switch2=false;
+    // set button1 pin to input+pullup
+    pinMode(BUTTON1_PIN, INPUT);
+    digitalWrite(BUTTON1_PIN, HIGH);
+    state.button1 = false;
+    // the light in the button, off
+    pinMode(LIGHT1_PIN, OUTPUT);
+    digitalWrite(LIGHT1_PIN, LOW);
+    state.light1 = false;
     // initial setup of digital pots / SPI communication
-    SET_PIN_HIGH(SPI_SS_PIN);
-    SET_PIN_HIGH(SPI_MOSI_PIN);
-    SET_PIN_HIGH(SPI_SCK_PIN);
-    SET_PIN_PULLUP(SPI_MISO_PIN);
-    state.drivemode=DRIVEMODE_OFF;
-    state.joyx=JOY_STOP;
-    state.joyy=JOY_STOP;
-    state.speedknob=SPEED_STOP;
-    // LEDS, hardware off, but all on for self test. ISR will set
-    SET_LED_PINS(PIN_HIZ,PIN_HIZ,PIN_HIZ);
-    state.leds=0b00111111;
-    // tell interrupt routine to update things
-    state.outputs=NOTVALID;
-    // busy loop until they're updated, this is important!
-    while (state.outputs==NOTVALID);
+    pinMode(SPI_SS_PIN, OUTPUT);
+    digitalWrite(SPI_SS_PIN, HIGH);
+    pinMode(SPI_MOSI_PIN, OUTPUT);
+    digitalWrite(SPI_MOSI_PIN, HIGH);
+    pinMode(SPI_SCK_PIN, OUTPUT);
+    digitalWrite(SPI_SCK_PIN, HIGH);
+    pinMode(SPI_MISO_PIN, INPUT);
+    digitalWrite(SPI_MISO_PIN, LOW);
+    // switch settings, no direct access to SWITCH1/2
+    state.drivemode = DRIVEMODE_OFF;
+    // Joystick initial position, centered @ 128,128
+    state.joyx = JOY_STOP;
+    state.joyy = JOY_STOP;
+    // Speed knob initial position, turtle slow @ 0
+    state.speedknob = SPEED_STOP;
+    // LEDS
+    state.leds = ALL_OFF;
+    state.blinkers = ALL_OFF;
 }
 
 // Interrupt is called once a millisecond
 ISR(TIMER0_COMPA_vect)
 {
-    static uint8_t ledTick=1;
-    static uint8_t ledTock=0;
-
-    // outputs flagged as changed, needing update?
-    if (state.outputs==NOTVALID) {
-        // update BUTTON1
-        state.button1=digitalRead(BUTTON1_PIN);
-        // update LIGHT1
-        digitalWrite(LIGHT1_PIN,(state.light1==true)?HIGH:LOW);
-        // update SWITCH1
-        digitalWrite(SWITCH1_PIN,(state.switch1==true)?HIGH:LOW);
-        // update SWITCH2
-        digitalWrite(SWITCH2_PIN,(state.switch2=true)?HIGH:LOW);
-        // update JOYX
-        // update JOYY
-        // update SPEEDKNOB
-        // update LEDS
-        // we only update every 16 milliseconds
-        //   it's probably going to flicker... adjust me!
-        ledTick--;
-        if (!ledTick) {
-            ledTick=16;
-            ledTock--;
-            switch (ledTock) {
-                case 6: // LED6
-                    if (state.leds&0b00100000) {
-                        SET_LED_PINS(PIN_LOW,PIN_HIZ,PIN_HIGH);
-                    }
-                    break;
-                case 5: // LED5
-                    if (state.leds&0b00010000) {
-                        SET_LED_PINS(PIN_HIGH,PIN_HIZ,PIN_LOW);
-                    }
-                    break;
-                case 4: // LED4
-                    if (state.leds&0b00001000) {
-                        SET_LED_PINS(PIN_HIZ,PIN_HIGH,PIN_LOW);
-                    }
-                    break;
-                case 3: // LED3
-                    if (state.leds&0b00000100) {
-                        SET_LED_PINS(PIN_LOW,PIN_HIGH,PIN_HIZ);
-                    }
-                    break;
-                case 2: // LED2
-                    if (state.leds&0b00000010) {
-                        SET_LED_PINS(PIN_HIZ,PIN_LOW,PIN_HIGH);
-                    }
-                    break;
-                case 1: // LED1
-                    if (state.leds&0b00000001) {
-                        SET_LED_PINS(PIN_HIGH,PIN_LOW,PIN_HIZ);
-                    }
-                    break;
-                default:
-                    // turn everything off
-                    SET_LED_PINS(PIN_HIZ,PIN_HIZ,PIN_HIZ);
-                    // reset to repeat loop
-                    ledTock=7;
-                    break;
-            }
-        }
-        state.outputs=VALID;
+    // keep track of blinkers
+    static uint8_t blinktick = 0;
+    static bool blinkstate = false;
+    static bool led_state = false;
+    // update BUTTON1
+    state.button1 = digitalRead(BUTTON1_PIN);
+    // update LIGHT1
+    digitalWrite(LIGHT1_PIN, (state.light1 == true) ? HIGH : LOW);
+    if (state.drivemode == DRIVEMODE_ONE) {
+        // DRIVEMODE_ONE
+        digitalWrite(SWITCH1_PIN, LOW);
+        digitalWrite(SWITCH2_PIN, HIGH);
+    } else if (state.drivemode == DRIVEMODE_TWO) {
+        // DRIVEMODE_TWO
+        digitalWrite(SWITCH1_PIN, LOW);
+        digitalWrite(SWITCH2_PIN, LOW);
+    } else {
+        // DRIVEMODE_OFF or ANYTHING else, shut down
+        digitalWrite(SWITCH1_PIN, HIGH);
+        digitalWrite(SWITCH2_PIN, LOW);
     }
+    // update JOYX
+    // update JOYY
+    // update SPEEDKNOB
+    // update LEDS
+    blinkstate = (blinktick++ >> 7);
+
+    led_state = blinkstate;
+    if (!(state.blinkers & state.leds & LED1)) {
+        led_state = state.leds & LED1;
+    }
+    digitalWrite(LED1_PIN, led_state);
+
+    led_state = blinkstate;
+    if (!(state.blinkers & state.leds & LED2)) {
+        led_state = state.leds & LED2;
+    }
+    digitalWrite(LED2_PIN, led_state);
+
+    led_state = blinkstate;
+    if (!(state.blinkers & state.leds & LED3)) {
+        led_state = state.leds & LED3;
+    }
+    digitalWrite(LED3_PIN, led_state);
+
+    led_state = blinkstate;
+    if (!(state.blinkers & state.leds & LED4)) {
+        led_state = state.leds & LED4;
+    }
+    digitalWrite(LED4_PIN, led_state);
 }
 
 void setup()
@@ -180,16 +160,35 @@ void setup()
     Serial.begin(9600);
 }
 
+int which = 0;
+
 void loop()
 {
-    delay(500);
-    state.light1=false;
-    state.outputs=NOTVALID;
-    while (state.outputs==NOTVALID);
+    delay(250);
+    state.light1 = false;
     Serial.print('0');
-    delay(500);
-    state.light1=true;
-    state.outputs=NOTVALID;
-    while (state.outputs==NOTVALID);
+    delay(250);
+    state.light1 = true;
     Serial.print('1');
+
+    state.blinkers = ALL_OFF;
+
+    state.leds = LED1;
+    delay(250);
+    state.leds |= LED2;
+    delay(250);
+    state.leds |= LED3;
+    delay(250);
+    state.leds |= LED4;
+    delay(500);
+    state.leds &= ~LED4;
+    delay(250);
+    state.leds &= ~LED3;
+    delay(250);
+    state.leds &= ~LED2;
+    delay(250);
+    state.leds &= ~LED1;
+    delay(250);
+    state.leds = ALL_OFF;
+    delay(250);
 }

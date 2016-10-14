@@ -1,4 +1,5 @@
-BOARD_TAG    = pro328
+BOARD_TAG    = uno
+#BOARD_TAG    = pro328
 ARDUINO_LIBS =
 
 include /usr/share/arduino/Arduino.mk
