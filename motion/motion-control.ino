@@ -33,7 +33,7 @@
  *          Logic:    SW1-Off   SW1-On
  *          SW2-Off   DRIVE-2   OFF
  *          SW2-On    DRIVE-1   *NOT*ALLOWED*
- *      Indicators: (charlieplexed)
+ *      Indicators:
  *          LED0 - Digital Output D5 - Illuminated button lamp
  *          LED1 - Digital Output D6
  *          LED2 - Digital Output D7
@@ -74,7 +74,16 @@ void setDefaultState()
     digitalWrite(SPI_SCK_PIN, HIGH);
     pinMode(SPI_MISO_PIN, INPUT);
     digitalWrite(SPI_MISO_PIN, LOW);
-    // switch settings, no direct access to SWITCH1/2
+    // LEDS 0-4
+    pinMode(LED0_PIN,OUTPUT);
+    pinMode(LED1_PIN,OUTPUT);
+    pinMode(LED2_PIN,OUTPUT);
+    pinMode(LED3_PIN,OUTPUT);
+    pinMode(LED4_PIN,OUTPUT);
+    // set mode for switch outputs
+    pinMode(SWITCH1_PIN,OUTPUT);
+    pinMode(SWITCH2_PIN,OUTPUT);
+    // switch settings, no direct access to SWITCH1/2 after this
     state.drivemode = DRIVEMODE_OFF;
     // Joystick initial position, centered @ 128,128
     state.joyx = JOY_STOP;
@@ -84,7 +93,7 @@ void setDefaultState()
     // LEDS - Bulb check
     state.flash = ALL_OFF;
     state.leds = ALL_ON;
-    delay(1000);
+    delay(1500);
     state.leds = ALL_OFF;
     delay(500);
 }
@@ -186,17 +195,21 @@ void setup()
     Serial.begin(9600);
 }
 
+uint8_t mode=0;
+
 void loop()
 {
-    // state.light1 = true;
-    // Serial.print('1');
-    // delay(250);
-    // state.light1 = false;
-    // Serial.print('0');
-    // delay(250);
+    state.flash = LED0;
 
-    state.leds = LED2 | LED4;
-    delay(1000);
-    state.leds = LED1 | LED3;
-    delay(1000);
+    state.leds = LED0 | LED1;
+    delay(200);
+    state.leds = LED0 | LED2;
+    delay(200);
+    state.leds = LED0 | LED3;
+    delay(200);
+    state.leds = LED0 | LED4;
+    delay(200);
+
+    mode=(mode+1)&3;
+    state.drivemode=mode;
 }
