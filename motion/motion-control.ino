@@ -58,13 +58,17 @@
 
 #include "motion-control.h"
 
-void setDefaultState()
+void Init_Timer0Interrupt()
 {
-    // set power-on state of variables so interrupt routine will output good
-    // values to hardware
-    // set button1 pin to input+pullup
-    pinMode(BUTTON1_PIN, INPUT);
-    digitalWrite(BUTTON1_PIN, HIGH);
+    // Timer0 is already used for millis()
+    // We'll use 'interrupt on compare match' to obtain a 1000Hz
+    // interrupt.  The OCR0A exact value is irrelevant, I like 13.
+    OCR0A = 0x0D;
+    TIMSK0 |= _BV(OCIE0A);
+}
+
+uint8_t Init_SPI()
+{
     // initial setup of digital pots / SPI communication
     pinMode(SPI_SS_PIN, OUTPUT);
     digitalWrite(SPI_SS_PIN, HIGH);
@@ -74,17 +78,39 @@ void setDefaultState()
     digitalWrite(SPI_SCK_PIN, HIGH);
     pinMode(SPI_MISO_PIN, INPUT);
     digitalWrite(SPI_MISO_PIN, LOW);
+    // set up initial SPI ports & control registers
+    SPCR = (1<<SPE)|(1<<MSTR);
+    // clear SPI2X in Status register, no 2X speed!
+    SPSR = 0;
+    // dummy reads to clear initial interrupt
+    return SPCR + SPDR;
+}
+
+void setDefaultState()
+{
+    // set power-on state of variables so interrupt routine will output good
+    // values to hardware
+    // set button1 pin to input+pullup
+    pinMode(BUTTON1_PIN, INPUT);
+    digitalWrite(BUTTON1_PIN, HIGH);
     // LEDS 0-4
-    pinMode(LED0_PIN,OUTPUT);
-    pinMode(LED1_PIN,OUTPUT);
-    pinMode(LED2_PIN,OUTPUT);
-    pinMode(LED3_PIN,OUTPUT);
-    pinMode(LED4_PIN,OUTPUT);
-    // set mode for switch outputs
-    pinMode(SWITCH1_PIN,OUTPUT);
-    pinMode(SWITCH2_PIN,OUTPUT);
+    pinMode(LED0_PIN, OUTPUT);
+    digitalWrite(LED0_PIN, LOW);
+    pinMode(LED1_PIN, OUTPUT);
+    digitalWrite(LED1_PIN, LOW);
+    pinMode(LED2_PIN, OUTPUT);
+    digitalWrite(LED2_PIN, LOW);
+    pinMode(LED3_PIN, OUTPUT);
+    digitalWrite(LED3_PIN, LOW);
+    pinMode(LED4_PIN, OUTPUT);
+    digitalWrite(LED4_PIN, LOW);
     // switch settings, no direct access to SWITCH1/2 after this
+    // set mode for switch outputs (default OFF, 1/0)
     state.drivemode = DRIVEMODE_OFF;
+    pinMode(SWITCH1_PIN, OUTPUT);
+    digitalWrite(SWITCH1_PIN, HIGH);
+    pinMode(SWITCH2_PIN, OUTPUT);
+    digitalWrite(SWITCH2_PIN, LOW);
     // Joystick initial position, centered @ 128,128
     state.joyx = JOY_STOP;
     state.joyy = JOY_STOP;
@@ -98,7 +124,29 @@ void setDefaultState()
     delay(500);
 }
 
-// Interrupt is called once a millisecond
+uint16_t inline SPI_send(uint8_t pot, uint8_t value)
+{
+    // used inside interrupt routine, no INTERRUPTS!
+    // so, no delay or related
+
+    static uint16_t retval;
+
+    // send two bytes to SPI bus (AD520x)
+    // ignore returned data, AD520x doesn't talk
+    // select AD520x device
+    digitalWrite(SPI_SS_PIN, LOW);
+    SPDR = pot;
+    while (!(SPSR & 0x80)) ;
+    retval = (SPDR << 8);
+    SPDR = value;
+    while (!(SPSR & 0x80)) ;
+    retval |= SPDR;
+    // allow AD520x to latch value
+    digitalWrite(SPI_SS_PIN, HIGH);
+    return retval;
+}
+
+// Interrupt ticks at 1024Hz
 ISR(TIMER0_COMPA_vect)
 {
     static uint8_t ISRtick = 0;
@@ -156,16 +204,16 @@ ISR(TIMER0_COMPA_vect)
     }
 
     //
-    // only update every 32nd tick (32Hz)
-    if ((ISRtick & 0x1F) == 0) {
+    // only update every 128th tick (8Hz)
+    if ((ISRtick & 0x7F) == 0) {
         //
         // set SWITCH1/2 based on state.drivemode
         if (state.drivemode == DRIVEMODE_ONE) {
             digitalWrite(SWITCH1_PIN, LOW);
-            digitalWrite(SWITCH2_PIN, HIGH);
+            digitalWrite(SWITCH2_PIN, LOW);
         } else if (state.drivemode == DRIVEMODE_TWO) {
             digitalWrite(SWITCH1_PIN, LOW);
-            digitalWrite(SWITCH2_PIN, LOW);
+            digitalWrite(SWITCH2_PIN, HIGH);
         } else {
             // DRIVEMODE_OFF or ANYTHING else, shut down
             digitalWrite(SWITCH1_PIN, HIGH);
@@ -177,39 +225,59 @@ ISR(TIMER0_COMPA_vect)
         //
         // update JOYX, JOYY, SPEEDKNOB
         // involves sending three bytes to SPI bus for AD5206 Digital Pot
+        // pot 1 (Joystick X)
+        SPI_send(0, state.joyx);
+        // pot 2 (joystick Y)
+        SPI_send(1, state.joyy);
+        // pot 3 (Speed Knob)
+        SPI_send(2, state.speedknob);
     }
 }
 
 void setup()
 {
-    // Timer0 is already used for millis()
-    // We'll use 'interrupt on compare match' to obtain a 1000Hz
-    // interrupt.  The OCR0A exact value is irrelevant, I like 13.
-    OCR0A = 0x0D;
-    TIMSK0 |= _BV(OCIE0A);
+    // set timer0 interrupt for 1024 ticks/sec
+    Init_Timer0Interrupt();
+
+    // initialize SPI system
+    Init_SPI();
 
     // initial state setup
     setDefaultState();
 
-    // slow and reliable
-    Serial.begin(9600);
+    // slow and reliable, when needed
+    // Serial.begin(9600);
 }
 
-uint8_t mode=0;
+uint8_t mode = 0;
 
 void loop()
 {
     state.flash = LED0;
 
-    state.leds = LED0 | LED1;
-    delay(200);
-    state.leds = LED0 | LED2;
-    delay(200);
-    state.leds = LED0 | LED3;
-    delay(200);
-    state.leds = LED0 | LED4;
-    delay(200);
+#define DEL 333
 
-    mode=(mode+1)&3;
-    state.drivemode=mode;
+    state.leds = LED0 | LED1;
+    delay(DEL);
+    state.leds = LED0 | LED2;
+    delay(DEL);
+    state.leds = LED0 | LED3;
+    delay(DEL);
+    state.leds = LED0 | LED4;
+    delay(DEL);
+
+    mode++;
+    if (mode == 3) {
+        mode = 0;
+    }
+    state.drivemode = mode;
+
+    if (mode == 0) {
+
+#define BUMP 32
+
+        state.joyx+=BUMP;
+        state.joyy-=BUMP;
+        state.speedknob+=BUMP;
+    }
 }

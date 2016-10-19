@@ -27,7 +27,7 @@ struct state {
 } state;
 
 // mostly for convienence and readability
-const uint8_t JOY_STOP = 128;
+const uint8_t JOY_STOP = 127;
 const uint8_t SPEED_STOP = 0;
 const uint8_t DRIVEMODE_OFF = 0;
 const uint8_t DRIVEMODE_ONE = 1;
@@ -40,22 +40,27 @@ const uint8_t LED4 = 0x10;
 const uint8_t ALL_OFF = 0;
 const uint8_t ALL_ON = LED0 | LED1 | LED2 | LED3 | LED4;
 // where is hardware attached?
-const uint8_t BUTTON1_PIN = 2;
-const uint8_t SWITCH1_PIN = 3;
-const uint8_t SWITCH2_PIN = 4;
-const uint8_t LED0_PIN = 5;
-const uint8_t LED1_PIN = 6;
-const uint8_t LED2_PIN = 7;
-const uint8_t LED3_PIN = 8;
-const uint8_t LED4_PIN = 9;
-const uint8_t SPI_SS_PIN = 10;
+const uint8_t BUTTON1_PIN  = 2;
+
+const uint8_t SWITCH1_PIN  = 3;
+const uint8_t SWITCH2_PIN  = 4;
+
+const uint8_t LED0_PIN     = 5;
+const uint8_t LED1_PIN     = 6;
+const uint8_t LED2_PIN     = 7;
+const uint8_t LED3_PIN     = 8;
+const uint8_t LED4_PIN     = 9;
+
+const uint8_t SPI_SS_PIN   = 10;
 const uint8_t SPI_MOSI_PIN = 11;
 const uint8_t SPI_MISO_PIN = 12;
-const uint8_t SPI_SCK_PIN = 13;
+const uint8_t SPI_SCK_PIN  = 13;
+
 const uint8_t ADC_SPI0_PIN = A0;
 const uint8_t ADC_SPI1_PIN = A1;
 const uint8_t ADC_SPI2_PIN = A2;
-const uint8_t I2C_SDA_PIN = A4;
-const uint8_t I2C_SCL_PIN = A5;
+
+const uint8_t I2C_SDA_PIN  = A4;
+const uint8_t I2C_SCL_PIN  = A5;
 
 #endif
