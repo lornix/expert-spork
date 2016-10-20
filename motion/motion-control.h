@@ -67,9 +67,9 @@ const uint8_t JOY_X_POT = 0;
 const uint8_t JOY_Y_POT = 1;
 const uint8_t SPEED_POT = 2;
 // nano Digital pins
-const uint8_t BUTTON1_PIN = 2;
-const uint8_t DM_SWITCH1_PIN = 3;
-const uint8_t DM_SWITCH2_PIN = 4;
+const uint8_t DM_SWITCH1_PIN = 2;
+const uint8_t DM_SWITCH2_PIN = 3;
+const uint8_t BUTTON1_PIN = 4;
 const uint8_t LED0_PIN = 5;
 const uint8_t LED1_PIN = 6;
 const uint8_t LED2_PIN = 7;

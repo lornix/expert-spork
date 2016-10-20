@@ -73,7 +73,7 @@ void inline setFlash(uint8_t mask)
     state.flash = mask;
 }
 
-void inline setDriveMode(uint8_t mode)
+void inline setDrivemode(uint8_t mode)
 {
     if (mode > DRIVEMODE_MAX) {
         mode = 0;
@@ -157,7 +157,7 @@ void initDefaultState()
     //
     // switch settings, no direct access to DM_SWITCH1/2 after this
     // set mode for switch outputs (default OFF, 1/0)
-    setDriveMode(DRIVEMODE_OFF);
+    setDrivemode(DRIVEMODE_OFF);
     pinModeSet(DM_SWITCH1_PIN, OUTPUT, HIGH);
     pinModeSet(DM_SWITCH2_PIN, OUTPUT, LOW);
     //
@@ -308,6 +308,14 @@ void loop()
     const uint16_t wait = 1500;
     const uint16_t longwait = wait * 5;
 
+    setJoy(0, 0);
+    setDrivemode(DRIVEMODE_ONE);
+    delay(3000);
+    setDrivemode(DRIVEMODE_TWO);
+    delay(3000);
+    setDrivemode(DRIVEMODE_OFF);
+    delay(3000);
+    return;
     setJoy(0, JOY_FORWARD);
     SPrintln("Forward");
     delay(longwait);
