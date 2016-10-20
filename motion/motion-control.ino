@@ -22,8 +22,11 @@
  *  SPI uses 4 pins, 10,11,12,13 for 1 device (AD5206 Digital Pot)
  *      SPI0 -> AD5206 Digital Pot - Joystick X (32-192, 128 default)
  *          Usable Range: 1.00vdc -> 4.00vdc range, 2.500vdc default
+ *          < 128 LEFT, > 128 RIGHT
  *      SPI1 -> AD5206 Digital Pot - Joystick Y (32-192, 128 default)
  *          Usable Range: 1.00vdc -> 4.00vdc range, 2.500vdc default
+ *          < 128 FORWARD, > 128 BACKWARD.
+ *          Flipped for sanity in SetJoy function
  *      SPI2 -> AD5206 Digital Pot - Speed Knob (0-255, 0 default)
  *          Turtle to Rabbit speed setting
  *
@@ -56,7 +59,54 @@
  *      SCK  SPI D13 --- D1 SER TX
  */
 
+// #define DEBUG
+
 #include "motion-control.h"
+
+void inline setLEDS(uint8_t mask)
+{
+    state.leds = mask;
+}
+
+void inline setFlash(uint8_t mask)
+{
+    state.flash = mask;
+}
+
+void inline setDriveMode(uint8_t mode)
+{
+    if (mode > DRIVEMODE_MAX) {
+        mode = 0;
+    }
+    state.drivemode = mode;
+}
+
+void inline setSpeedKnob(uint8_t speedknob)
+{
+    state.speedknob = speedknob;
+}
+
+void inline setJoy(int8_t xpos, int8_t ypos)
+{
+    // either out of range?  ignore request
+    if ((ABS8(xpos) > JOY_DELTA_MAX) || (ABS8(ypos) > JOY_DELTA_MAX)) {
+        // out of range?   STOP!!!
+        xpos = 0;
+        ypos = 0;
+        // return
+    }
+    // -xpos is left, +xpos is right
+    state.joyx = JOY_STOP + xpos;
+    // flip sign of fwd/bkw signal
+    // -ypos is backwards, +ypos is forwards
+    state.joyy = JOY_STOP - ypos;
+}
+
+void inline pinModeSet(uint8_t pin, uint8_t dir, uint8_t state)
+{
+    pinMode(pin, dir);
+    digitalWrite(pin, state);
+}
 
 void Init_Timer0Interrupt()
 {
@@ -67,83 +117,84 @@ void Init_Timer0Interrupt()
     TIMSK0 |= _BV(OCIE0A);
 }
 
-uint8_t Init_SPI()
+void Init_SPI()
 {
-    // initial setup of digital pots / SPI communication
-    pinMode(SPI_SS_PIN, OUTPUT);
-    digitalWrite(SPI_SS_PIN, HIGH);
+    // initial setup of SPI module
+
+    SPrint(__func__);
+    SPrint(": ");
+
     pinMode(SPI_MOSI_PIN, OUTPUT);
-    digitalWrite(SPI_MOSI_PIN, HIGH);
     pinMode(SPI_SCK_PIN, OUTPUT);
-    digitalWrite(SPI_SCK_PIN, HIGH);
     pinMode(SPI_MISO_PIN, INPUT);
-    digitalWrite(SPI_MISO_PIN, LOW);
+    // SS pin MUST be OUTPUT/HIGH for Master SPI
+    pinModeSet(SPI_SS_PIN, OUTPUT, HIGH);
     // set up initial SPI ports & control registers
-    SPCR = (1<<SPE)|(1<<MSTR);
+    SPCR = (1 << SPE) | (1 << MSTR);
     // clear SPI2X in Status register, no 2X speed!
     SPSR = 0;
-    // dummy reads to clear initial interrupt
-    return SPCR + SPDR;
+
+    SPrintln("Done");
 }
 
-void setDefaultState()
+void initDefaultState()
 {
-    // set power-on state of variables so interrupt routine will output good
-    // values to hardware
+    SPrint(__func__);
+    SPrint(": ");
+
+    // set power-on state of variables so interrupt routine
+    // will output proper values to hardware
+    //
     // set button1 pin to input+pullup
-    pinMode(BUTTON1_PIN, INPUT);
-    digitalWrite(BUTTON1_PIN, HIGH);
+    pinModeSet(BUTTON1_PIN, INPUT, HIGH);
+    //
     // LEDS 0-4
-    pinMode(LED0_PIN, OUTPUT);
-    digitalWrite(LED0_PIN, LOW);
-    pinMode(LED1_PIN, OUTPUT);
-    digitalWrite(LED1_PIN, LOW);
-    pinMode(LED2_PIN, OUTPUT);
-    digitalWrite(LED2_PIN, LOW);
-    pinMode(LED3_PIN, OUTPUT);
-    digitalWrite(LED3_PIN, LOW);
-    pinMode(LED4_PIN, OUTPUT);
-    digitalWrite(LED4_PIN, LOW);
-    // switch settings, no direct access to SWITCH1/2 after this
+    pinModeSet(LED0_PIN, OUTPUT, LOW);
+    pinModeSet(LED1_PIN, OUTPUT, LOW);
+    pinModeSet(LED2_PIN, OUTPUT, LOW);
+    pinModeSet(LED3_PIN, OUTPUT, LOW);
+    pinModeSet(LED4_PIN, OUTPUT, LOW);
+    //
+    // switch settings, no direct access to DM_SWITCH1/2 after this
     // set mode for switch outputs (default OFF, 1/0)
-    state.drivemode = DRIVEMODE_OFF;
-    pinMode(SWITCH1_PIN, OUTPUT);
-    digitalWrite(SWITCH1_PIN, HIGH);
-    pinMode(SWITCH2_PIN, OUTPUT);
-    digitalWrite(SWITCH2_PIN, LOW);
+    setDriveMode(DRIVEMODE_OFF);
+    pinModeSet(DM_SWITCH1_PIN, OUTPUT, HIGH);
+    pinModeSet(DM_SWITCH2_PIN, OUTPUT, LOW);
+    //
     // Joystick initial position, centered @ 128,128
-    state.joyx = JOY_STOP;
-    state.joyy = JOY_STOP;
+    setJoy(0, 0);
+    //
     // Speed knob initial position, turtle slow @ 0
-    state.speedknob = SPEED_STOP;
+    setSpeedKnob(0);
+    //
     // LEDS - Bulb check
-    state.flash = ALL_OFF;
-    state.leds = ALL_ON;
-    delay(1500);
-    state.leds = ALL_OFF;
+    SPrint("(Lamp Check) ");
+    setFlash(ALL_OFF);
+    setLEDS(ALL_ON);
+    delay(2000);
+    SPrint("(All Off) ");
+    setLEDS(ALL_OFF);
     delay(500);
+
+    SPrintln("Done");
 }
 
-uint16_t inline SPI_send(uint8_t pot, uint8_t value)
+void SPI_send(uint8_t pot, uint8_t value)
 {
     // used inside interrupt routine, no INTERRUPTS!
-    // so, no delay or related
-
-    static uint16_t retval;
-
+    // so, no delay or serial
+    //
     // send two bytes to SPI bus (AD520x)
     // ignore returned data, AD520x doesn't talk
-    // select AD520x device
+    //
+    // select AD520x device (nCS = LOW)
     digitalWrite(SPI_SS_PIN, LOW);
     SPDR = pot;
     while (!(SPSR & 0x80)) ;
-    retval = (SPDR << 8);
     SPDR = value;
     while (!(SPSR & 0x80)) ;
-    retval |= SPDR;
-    // allow AD520x to latch value
+    // allow AD520x to latch value (nCS = HIGH)
     digitalWrite(SPI_SS_PIN, HIGH);
-    return retval;
 }
 
 // Interrupt ticks at 1024Hz
@@ -201,41 +252,45 @@ ISR(TIMER0_COMPA_vect)
             led_state = blinkstate;
         }
         digitalWrite(LED4_PIN, led_state);
+        //
+        // update BUTTON1 (Will this need debounce?)
+        state.button1 = digitalRead(BUTTON1_PIN);
     }
-
     //
     // only update every 128th tick (8Hz)
     if ((ISRtick & 0x7F) == 0) {
         //
-        // set SWITCH1/2 based on state.drivemode
+        // set DM_SWITCH1/2 based on state.drivemode
         if (state.drivemode == DRIVEMODE_ONE) {
-            digitalWrite(SWITCH1_PIN, LOW);
-            digitalWrite(SWITCH2_PIN, LOW);
+            digitalWrite(DM_SWITCH1_PIN, LOW);
+            digitalWrite(DM_SWITCH2_PIN, LOW);
         } else if (state.drivemode == DRIVEMODE_TWO) {
-            digitalWrite(SWITCH1_PIN, LOW);
-            digitalWrite(SWITCH2_PIN, HIGH);
+            digitalWrite(DM_SWITCH1_PIN, LOW);
+            digitalWrite(DM_SWITCH2_PIN, HIGH);
         } else {
             // DRIVEMODE_OFF or ANYTHING else, shut down
-            digitalWrite(SWITCH1_PIN, HIGH);
-            digitalWrite(SWITCH2_PIN, LOW);
+            digitalWrite(DM_SWITCH1_PIN, HIGH);
+            digitalWrite(DM_SWITCH2_PIN, LOW);
         }
-        //
-        // update BUTTON1 (Will this need debounce?)
-        state.button1 = digitalRead(BUTTON1_PIN);
         //
         // update JOYX, JOYY, SPEEDKNOB
         // involves sending three bytes to SPI bus for AD5206 Digital Pot
         // pot 1 (Joystick X)
-        SPI_send(0, state.joyx);
+        SPI_send(JOY_X_POT, state.joyx);
         // pot 2 (joystick Y)
-        SPI_send(1, state.joyy);
+        SPI_send(JOY_Y_POT, state.joyy);
         // pot 3 (Speed Knob)
-        SPI_send(2, state.speedknob);
+        SPI_send(SPEED_POT, state.speedknob);
     }
 }
 
 void setup()
 {
+    // slow and reliable
+    SBegin(9600);
+    SPrint(__func__);
+    SPrintln(": ");
+
     // set timer0 interrupt for 1024 ticks/sec
     Init_Timer0Interrupt();
 
@@ -243,41 +298,37 @@ void setup()
     Init_SPI();
 
     // initial state setup
-    setDefaultState();
+    initDefaultState();
 
-    // slow and reliable, when needed
-    // Serial.begin(9600);
+    SPrintln("Setup complete");
 }
-
-uint8_t mode = 0;
 
 void loop()
 {
-    state.flash = LED0;
+    const uint16_t wait = 1500;
+    const uint16_t longwait = wait * 5;
 
-#define DEL 333
-
-    state.leds = LED0 | LED1;
-    delay(DEL);
-    state.leds = LED0 | LED2;
-    delay(DEL);
-    state.leds = LED0 | LED3;
-    delay(DEL);
-    state.leds = LED0 | LED4;
-    delay(DEL);
-
-    mode++;
-    if (mode == 3) {
-        mode = 0;
-    }
-    state.drivemode = mode;
-
-    if (mode == 0) {
-
-#define BUMP 32
-
-        state.joyx+=BUMP;
-        state.joyy-=BUMP;
-        state.speedknob+=BUMP;
-    }
+    setJoy(0, JOY_FORWARD);
+    SPrintln("Forward");
+    delay(longwait);
+    setJoy(0, 0);
+    delay(wait);
+    setJoy(JOY_RIGHT, 0);
+    SPrintln("Right");
+    delay(longwait);
+    setJoy(0, 0);
+    delay(wait);
+    setJoy(0, JOY_BACKWARD);
+    SPrintln("Backward");
+    delay(longwait);
+    setJoy(0, 0);
+    delay(wait);
+    setJoy(JOY_LEFT, 0);
+    SPrintln("Left");
+    delay(longwait);
+    setJoy(0, 0);
+    delay(wait);
+    setJoy(0, 0);
+    SPrintln("Stop");
+    delay(longwait);
 }
