@@ -15,13 +15,13 @@
 // remove Serial statements if not debugging
 // 1.5K+ ram difference!
 #  ifdef DEBUG
-#    define SBegin(x)   Serial.begin(x)
-#    define SPrintln(x) Serial.println(x)
-#    define SPrint(x)   Serial.print(x)
+#    define Sbegin(x)   Serial.begin(x)
+#    define Sprintln(x) Serial.println(x)
+#    define Sprint(x)   Serial.print(x)
 #  else
-#    define SBegin(x)
-#    define SPrintln(x)
-#    define SPrint(x)
+#    define Sbegin(x)
+#    define Sprintln(x)
+#    define Sprint(x)
 #  endif
 
 // Interrupt volatile variables for state information
@@ -68,8 +68,8 @@ const uint8_t JOY_Y_POT = 1;
 const uint8_t SPEED_POT = 2;
 // nano Digital pins
 const uint8_t DM_SWITCH1_PIN = 2;
-const uint8_t DM_SWITCH2_PIN = 3;
-const uint8_t BUTTON1_PIN = 4;
+const uint8_t DM_SWITCH2_PIN = 4;
+const uint8_t BUTTON1_PIN = 3;
 const uint8_t LED0_PIN = 5;
 const uint8_t LED1_PIN = 6;
 const uint8_t LED2_PIN = 7;

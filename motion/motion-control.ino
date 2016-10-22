@@ -59,7 +59,7 @@
  *      SCK  SPI D13 --- D1 SER TX
  */
 
-// #define DEBUG
+#define DEBUG
 
 #include "motion-control.h"
 
@@ -93,7 +93,6 @@ void inline setJoy(int8_t xpos, int8_t ypos)
         // out of range?   STOP!!!
         xpos = 0;
         ypos = 0;
-        // return
     }
     // -xpos is left, +xpos is right
     state.joyx = JOY_STOP + xpos;
@@ -121,8 +120,8 @@ void Init_SPI()
 {
     // initial setup of SPI module
 
-    SPrint(__func__);
-    SPrint(": ");
+    Sprint(__func__);
+    Sprint(": ");
 
     pinMode(SPI_MOSI_PIN, OUTPUT);
     pinMode(SPI_SCK_PIN, OUTPUT);
@@ -134,13 +133,13 @@ void Init_SPI()
     // clear SPI2X in Status register, no 2X speed!
     SPSR = 0;
 
-    SPrintln("Done");
+    Sprintln("Done");
 }
 
 void initDefaultState()
 {
-    SPrint(__func__);
-    SPrint(": ");
+    Sprint(__func__);
+    Sprint(": ");
 
     // set power-on state of variables so interrupt routine
     // will output proper values to hardware
@@ -168,15 +167,15 @@ void initDefaultState()
     setSpeedKnob(0);
     //
     // LEDS - Bulb check
-    SPrint("(Lamp Check) ");
+    Sprint("(Lamp Check) ");
     setFlash(ALL_OFF);
     setLEDS(ALL_ON);
     delay(2000);
-    SPrint("(All Off) ");
+    Sprint("(All Off) ");
     setLEDS(ALL_OFF);
     delay(500);
 
-    SPrintln("Done");
+    Sprintln("Done");
 }
 
 void SPI_send(uint8_t pot, uint8_t value)
@@ -261,16 +260,17 @@ ISR(TIMER0_COMPA_vect)
     if ((ISRtick & 0x7F) == 0) {
         //
         // set DM_SWITCH1/2 based on state.drivemode
+        // remember logic is reversed due to relay interface board
         if (state.drivemode == DRIVEMODE_ONE) {
             digitalWrite(DM_SWITCH1_PIN, LOW);
-            digitalWrite(DM_SWITCH2_PIN, LOW);
+            digitalWrite(DM_SWITCH2_PIN, HIGH);
         } else if (state.drivemode == DRIVEMODE_TWO) {
             digitalWrite(DM_SWITCH1_PIN, LOW);
-            digitalWrite(DM_SWITCH2_PIN, HIGH);
+            digitalWrite(DM_SWITCH2_PIN, LOW);
         } else {
             // DRIVEMODE_OFF or ANYTHING else, shut down
             digitalWrite(DM_SWITCH1_PIN, HIGH);
-            digitalWrite(DM_SWITCH2_PIN, LOW);
+            digitalWrite(DM_SWITCH2_PIN, HIGH);
         }
         //
         // update JOYX, JOYY, SPEEDKNOB
@@ -287,9 +287,9 @@ ISR(TIMER0_COMPA_vect)
 void setup()
 {
     // slow and reliable
-    SBegin(9600);
-    SPrint(__func__);
-    SPrintln(": ");
+    Sbegin(9600);
+    Sprint(__func__);
+    Sprintln(": ");
 
     // set timer0 interrupt for 1024 ticks/sec
     Init_Timer0Interrupt();
@@ -300,43 +300,12 @@ void setup()
     // initial state setup
     initDefaultState();
 
-    SPrintln("Setup complete");
+    Sprintln("Setup complete");
 }
 
 void loop()
 {
-    const uint16_t wait = 1500;
-    const uint16_t longwait = wait * 5;
-
     setJoy(0, 0);
     setDrivemode(DRIVEMODE_ONE);
-    delay(3000);
-    setDrivemode(DRIVEMODE_TWO);
-    delay(3000);
-    setDrivemode(DRIVEMODE_OFF);
-    delay(3000);
-    return;
-    setJoy(0, JOY_FORWARD);
-    SPrintln("Forward");
-    delay(longwait);
-    setJoy(0, 0);
-    delay(wait);
-    setJoy(JOY_RIGHT, 0);
-    SPrintln("Right");
-    delay(longwait);
-    setJoy(0, 0);
-    delay(wait);
-    setJoy(0, JOY_BACKWARD);
-    SPrintln("Backward");
-    delay(longwait);
-    setJoy(0, 0);
-    delay(wait);
-    setJoy(JOY_LEFT, 0);
-    SPrintln("Left");
-    delay(longwait);
-    setJoy(0, 0);
-    delay(wait);
-    setJoy(0, 0);
-    SPrintln("Stop");
-    delay(longwait);
+    while (1) ;
 }
