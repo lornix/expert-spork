@@ -2,61 +2,6 @@
  * motion-control:
  * Accept commands from I2C bus, activate appropriate outputs to cause
  * desired actions.
- *
- * I2C address: 0x10
- *
- * I2C Bus (Pins A4+A5) used for inter-device communications
- * Command codes (TBD)
- * Response codes (TBD)
- *
- *  Inputs: Hardware
- *      BUTTON1 - Digital Input D2 - Illuminated button
- *
- *  Possibly only for testing, ADC reads are expensive
- *      SPI0 - Analog Input A0 - Joystick X sense (0-1023, 0-5VDC)
- *      SPI1 - Analog Input A1 - Joystick Y sense (0-1023, 0-5VDC)
- *      SPI2 - Analog Input A2 - Speed knob sense (0-1023, 0-5VDC)
- *
- *  Outputs: Hardware
- *
- *  SPI uses 4 pins, 10,11,12,13 for 1 device (AD5206 Digital Pot)
- *      SPI0 -> AD5206 Digital Pot - Joystick X (32-192, 128 default)
- *          Usable Range: 1.00vdc -> 4.00vdc range, 2.500vdc default
- *          < 128 LEFT, > 128 RIGHT
- *      SPI1 -> AD5206 Digital Pot - Joystick Y (32-192, 128 default)
- *          Usable Range: 1.00vdc -> 4.00vdc range, 2.500vdc default
- *          < 128 FORWARD, > 128 BACKWARD.
- *          Flipped for sanity in SetJoy function
- *      SPI2 -> AD5206 Digital Pot - Speed Knob (0-255, 0 default)
- *          Turtle to Rabbit speed setting
- *
- *  Digital Outputs use 1 pin each:
- *      SW1  -> Digital Output D3 - Profile switch 1
- *      SW2  -> Digital Output D4 - Profile Switch 2
- *          Logic:    SW1-Off   SW1-On
- *          SW2-Off   DRIVE-2   OFF
- *          SW2-On    DRIVE-1   *NOT*ALLOWED*
- *      Indicators:
- *          LED0 - Digital Output D5 - Illuminated button lamp
- *          LED1 - Digital Output D6
- *          LED2 - Digital Output D7
- *          LED3 - Digital Output D8
- *          LED4 - Digital Output D9
- *
- *  For all Pots (Digital AD5206 or otherwise), Terminal B is ALWAYS
- *  ground, Terminal A is ALWAYS VCC (5VDC), Wiper W varies (0=B,255=A).
- *
- *  Pins used on Arduino Pro Mini (3.3v) or Nano (5.0v)
- *      SPI0 AIN  A0 --- D2 DIN BUTTON1
- *      SPI1 AIN  A1 --- D3 OUT SW1
- *      SPI2 AIN  A2 --- D4 OUT SW2
- *      ?    ?    A3 --- D5 OUT LED0
- *      SDA  I2C  A4 --- D6 OUT LED1
- *      SCL  I2C  A5 --- D7 OUT LED2
- *      SS   SPI D10 --- D8 OUT LED3
- *      MOSI SPI D11 --- D9 OUT LED4
- *      MISO SPI D12 --- D0 SER RX
- *      SCK  SPI D13 --- D1 SER TX
  */
 
 #define DEBUG
