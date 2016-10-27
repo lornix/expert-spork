@@ -4,11 +4,9 @@
  * desired actions.
  */
 
-#define DEBUG
-
 #include "motion-control.h"
 
-void inline setLEDS(uint8_t mask)
+void inline setLED(uint8_t mask)
 {
     state.leds = mask;
 }
@@ -21,14 +19,23 @@ void inline setFlash(uint8_t mask)
 void inline setDrivemode(uint8_t mode)
 {
     if (mode > DRIVEMODE_MAX) {
-        mode = 0;
+        mode = DRIVEMODE_OFF;
     }
     state.drivemode = mode;
+    if (mode!=DRIVEMODE_OFF) {
+        // give time for control module to start
+        delay(DRIVEMODE_DELAY_MS);
+    }
 }
 
 void inline setSpeedKnob(uint8_t speedknob)
 {
+    if (speedknob > SPEED_MAX) {
+        speedknob = SPEED_MAX;
+    }
     state.speedknob = speedknob;
+    // don't do math in interrupt routine
+    state.speedknob_real = speedknob * 255 / SPEED_MAX;
 }
 
 void inline setJoy(int8_t xpos, int8_t ypos)
@@ -44,6 +51,51 @@ void inline setJoy(int8_t xpos, int8_t ypos)
     // flip sign of fwd/bkw signal
     // -ypos is backwards, +ypos is forwards
     state.joyy = JOY_STOP - ypos;
+}
+
+void setAnglePush(int16_t angle, uint8_t push)
+{
+    if ((ABS16(angle)>180)||(push>JOY_PUSH_MAX)) {
+        // out of range? zero!
+        angle=0;
+        push=0;
+    }
+    //
+    // convert to radians
+    // float angleRads = (float)angle * PI / 180.0;
+    //
+    // I don't really want to invoke sin/cos, they're
+    // memory expensive (1.6K+!).  CPU time is ok, only invoked
+    //  once to set joyx,joyy positions
+    // int16_t x=sin(angleRads)*force;
+    // int16_t y=cos(angleRads)*force;
+
+    int16_t force=(JOY_DELTA_MAX*push)/JOY_PUSH_MAX;
+    int16_t force7 = (force * 7) / 10;
+
+    int16_t x=0;
+    int16_t y=0;
+
+    int16_t absangle=ABS16(angle);
+
+    // decode 8 directions (4 here, then flipped across Y-axis)
+    if (absangle<23) { // 0
+        x=0; y=force;
+    } else if ((absangle>22)&&(absangle<68)) { // 45
+        x=force7; y=force7;
+    } else if ((absangle>67)&&(absangle<113)) { // 90
+        x=force; y=0;
+    } else if ((absangle>112)&&(absangle<158)) { // 135
+        x=force7; y=-force7;
+    } else { // 180
+        x=0; y=-force;
+    }
+    //
+    // flip across Y-axis if angle negative
+    if (angle<0) {
+        x=-x;
+    }
+    setJoy(x,y);
 }
 
 void inline pinModeSet(uint8_t pin, uint8_t dir, uint8_t state)
@@ -65,9 +117,6 @@ void Init_SPI()
 {
     // initial setup of SPI module
 
-    Sprint(__func__);
-    Sprint(": ");
-
     pinMode(SPI_MOSI_PIN, OUTPUT);
     pinMode(SPI_SCK_PIN, OUTPUT);
     pinMode(SPI_MISO_PIN, INPUT);
@@ -77,17 +126,18 @@ void Init_SPI()
     SPCR = (1 << SPE) | (1 << MSTR);
     // clear SPI2X in Status register, no 2X speed!
     SPSR = 0;
-
-    Sprintln("Done");
 }
 
 void initDefaultState()
 {
-    Sprint(__func__);
-    Sprint(": ");
-
+    //
     // set power-on state of variables so interrupt routine
     // will output proper values to hardware
+    //
+    // set mode for switch outputs (default OFF)
+    pinModeSet(DM_SWITCH1_PIN, OUTPUT, HIGH);
+    pinModeSet(DM_SWITCH2_PIN, OUTPUT, HIGH);
+    setDrivemode(DRIVEMODE_OFF);
     //
     // set button1 pin to input+pullup
     pinModeSet(BUTTON1_PIN, INPUT, HIGH);
@@ -99,28 +149,17 @@ void initDefaultState()
     pinModeSet(LED3_PIN, OUTPUT, LOW);
     pinModeSet(LED4_PIN, OUTPUT, LOW);
     //
-    // switch settings, no direct access to DM_SWITCH1/2 after this
-    // set mode for switch outputs (default OFF, 1/0)
-    setDrivemode(DRIVEMODE_OFF);
-    pinModeSet(DM_SWITCH1_PIN, OUTPUT, HIGH);
-    pinModeSet(DM_SWITCH2_PIN, OUTPUT, LOW);
-    //
-    // Joystick initial position, centered @ 128,128
-    setJoy(0, 0);
+    setFlash(ALL_OFF);
+    setLED(ALL_OFF);
     //
     // Speed knob initial position, turtle slow @ 0
     setSpeedKnob(0);
     //
-    // LEDS - Bulb check
-    Sprint("(Lamp Check) ");
-    setFlash(ALL_OFF);
-    setLEDS(ALL_ON);
-    delay(2000);
-    Sprint("(All Off) ");
-    setLEDS(ALL_OFF);
-    delay(500);
-
-    Sprintln("Done");
+    // Joystick initial position, centered @ 128,128
+    // setJoy(0, 0);
+    //
+    // set angle / push to 0's initially
+    setAnglePush(0,0);
 }
 
 void SPI_send(uint8_t pot, uint8_t value)
@@ -153,14 +192,16 @@ ISR(TIMER0_COMPA_vect)
     ISRtick++;
 
     //
-    // update LEDS
+    // update LEDs
     // use ISRtick to toggle blinkstate, gives ~2Hz blink rate
     if (!ISRtick) {
         blinkstate = !blinkstate;
     }
     //
     // only update LED's every 16th tick (64Hz)
-    if (!(ISRtick & 0x0f)) {
+    if ((ISRtick & 0x0f) == 5 ) {
+        // offset by 5 ticks so LEDs and SPI
+        // don't occur same tick
         //
         // LED0
         led_state = state.leds & LED0;
@@ -202,7 +243,7 @@ ISR(TIMER0_COMPA_vect)
     }
     //
     // only update every 128th tick (8Hz)
-    if ((ISRtick & 0x7F) == 0) {
+    if ((ISRtick & 0x7F) == 7) {
         //
         // set DM_SWITCH1/2 based on state.drivemode
         // remember logic is reversed due to relay interface board
@@ -225,16 +266,14 @@ ISR(TIMER0_COMPA_vect)
         // pot 2 (joystick Y)
         SPI_send(JOY_Y_POT, state.joyy);
         // pot 3 (Speed Knob)
-        SPI_send(SPEED_POT, state.speedknob);
+        SPI_send(SPEED_POT, state.speedknob_real);
     }
 }
 
 void setup()
 {
     // slow and reliable
-    Sbegin(9600);
-    Sprint(__func__);
-    Sprintln(": ");
+    Serial.begin(9600);
 
     // set timer0 interrupt for 1024 ticks/sec
     Init_Timer0Interrupt();
@@ -244,13 +283,19 @@ void setup()
 
     // initial state setup
     initDefaultState();
-
-    Sprintln("Setup complete");
 }
 
 void loop()
 {
-    setJoy(0, 0);
+    static bool led=true;
     setDrivemode(DRIVEMODE_ONE);
-    while (1) ;
+    delay(2000);
+    setDrivemode(DRIVEMODE_TWO);
+    delay(2000);
+    setDrivemode(DRIVEMODE_OFF);
+    while (1) {
+        setLED(led?LED0:ALL_OFF);
+        led=!led;
+        delay(2000);
+    }
 }
