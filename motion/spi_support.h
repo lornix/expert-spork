@@ -3,13 +3,13 @@
  * Setup, transmit & receive on SPI bus
  */
 
-void Init_SPI()
+void static Init_SPI()
 {
     // initial setup of SPI module
 
-    pinMode(SPI_MOSI_PIN, OUTPUT);
-    pinMode(SPI_SCK_PIN, OUTPUT);
-    pinMode(SPI_MISO_PIN, INPUT);
+    pinModeSet(SPI_MOSI_PIN, OUTPUT, HIGH);
+    pinModeSet(SPI_SCK_PIN, OUTPUT, HIGH);
+    pinModeSet(SPI_MISO_PIN, INPUT, HIGH);
     // SS pin MUST be OUTPUT/HIGH for Master SPI
     pinModeSet(SPI_SS_PIN, OUTPUT, HIGH);
     // set up initial SPI ports & control registers
@@ -18,7 +18,7 @@ void Init_SPI()
     SPSR = 0;
 }
 
-void SPI_send(uint8_t pot, uint8_t value)
+void static SPI_sendPots(uint8_t pot, uint8_t value)
 {
     // used inside interrupt routine, no INTERRUPTS!
     // so, no delay or serial
@@ -27,11 +27,11 @@ void SPI_send(uint8_t pot, uint8_t value)
     // ignore returned data, AD520x doesn't talk
     //
     // select AD520x device (nCS = LOW)
-    digitalWrite(SPI_SS_PIN, LOW);
+    digWrite(SPI_SS_PIN, LOW);
     SPDR = pot;
     while (!(SPSR & 0x80)) ;
     SPDR = value;
     while (!(SPSR & 0x80)) ;
     // allow AD520x to latch value (nCS = HIGH)
-    digitalWrite(SPI_SS_PIN, HIGH);
+    digWrite(SPI_SS_PIN, HIGH);
 }

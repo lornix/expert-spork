@@ -9,17 +9,17 @@
 #include "uart_support.h"
 #include "spi_support.h"
 
-void inline setLED(uint8_t mask)
+void static inline setLED(uint8_t mask)
 {
     state.leds = mask;
 }
 
-void inline setFlash(uint8_t mask)
+void static inline setFlash(uint8_t mask)
 {
     state.flash = mask;
 }
 
-void inline setDrivemode(uint8_t mode)
+void static inline setDrivemode(uint8_t mode)
 {
     if (mode > DRIVEMODE_MAX) {
         mode = DRIVEMODE_OFF;
@@ -31,7 +31,7 @@ void inline setDrivemode(uint8_t mode)
     }
 }
 
-void inline setSpeedKnob(uint8_t speedknob)
+void static inline setSpeedKnob(uint8_t speedknob)
 {
     if (speedknob > SPEED_MAX) {
         speedknob = SPEED_MAX;
@@ -41,7 +41,7 @@ void inline setSpeedKnob(uint8_t speedknob)
     state.speedknob_real = speedknob * 255 / SPEED_MAX;
 }
 
-void inline setJoy(int8_t xpos, int8_t ypos)
+void static inline setJoy(int8_t xpos, int8_t ypos)
 {
     // either out of range?  ignore request
     if ((ABS8(xpos) > JOY_DELTA_MAX) || (ABS8(ypos) > JOY_DELTA_MAX)) {
@@ -56,7 +56,7 @@ void inline setJoy(int8_t xpos, int8_t ypos)
     state.joyy = JOY_STOP - ypos;
 }
 
-void setAnglePush(int16_t angle, uint8_t push)
+void static setAnglePush(int16_t angle, uint8_t push)
 {
     if ((ABS16(angle)>180)||(push>JOY_PUSH_MAX)) {
         // out of range? zero!
@@ -101,7 +101,7 @@ void setAnglePush(int16_t angle, uint8_t push)
     setJoy(x,y);
 }
 
-void Init_Timer0Interrupt()
+void static Init_Timer0Interrupt()
 {
     // Timer0 is already used for millis()
     // We'll use 'interrupt on compare match' to obtain a 1000Hz
@@ -110,7 +110,7 @@ void Init_Timer0Interrupt()
     TIMSK0 |= _BV(OCIE0A);
 }
 
-void initDefaultState()
+void static initDefaultState()
 {
     //
     // set power-on state of variables so interrupt routine
@@ -172,35 +172,35 @@ ISR(TIMER0_COMPA_vect)
         if (state.flash & led_state) {
             led_state = blinkstate;
         }
-        digitalWrite(LED0_PIN, led_state);
+        digWrite(LED0_PIN, led_state);
         //
         // LED1
         led_state = state.leds & LED1;
         if (state.flash & led_state) {
             led_state = blinkstate;
         }
-        digitalWrite(LED1_PIN, led_state);
+        digWrite(LED1_PIN, led_state);
         //
         // LED2
         led_state = state.leds & LED2;
         if (state.flash & led_state) {
             led_state = blinkstate;
         }
-        digitalWrite(LED2_PIN, led_state);
+        digWrite(LED2_PIN, led_state);
         //
         // LED3
         led_state = state.leds & LED3;
         if (state.flash & led_state) {
             led_state = blinkstate;
         }
-        digitalWrite(LED3_PIN, led_state);
+        digWrite(LED3_PIN, led_state);
         //
         // LED4
         led_state = state.leds & LED4;
         if (state.flash & led_state) {
             led_state = blinkstate;
         }
-        digitalWrite(LED4_PIN, led_state);
+        digWrite(LED4_PIN, led_state);
         //
         // update BUTTON1 (Will this need debounce?)
         state.button1 = digitalRead(BUTTON1_PIN);
@@ -212,25 +212,25 @@ ISR(TIMER0_COMPA_vect)
         // set DM_SWITCH1/2 based on state.drivemode
         // remember logic is reversed due to relay interface board
         if (state.drivemode == DRIVEMODE_ONE) {
-            digitalWrite(DM_SWITCH1_PIN, LOW);
-            digitalWrite(DM_SWITCH2_PIN, HIGH);
+            digWrite(DM_SWITCH1_PIN, LOW);
+            digWrite(DM_SWITCH2_PIN, HIGH);
         } else if (state.drivemode == DRIVEMODE_TWO) {
-            digitalWrite(DM_SWITCH1_PIN, LOW);
-            digitalWrite(DM_SWITCH2_PIN, LOW);
+            digWrite(DM_SWITCH1_PIN, LOW);
+            digWrite(DM_SWITCH2_PIN, LOW);
         } else {
             // DRIVEMODE_OFF or ANYTHING else, shut down
-            digitalWrite(DM_SWITCH1_PIN, HIGH);
-            digitalWrite(DM_SWITCH2_PIN, HIGH);
+            digWrite(DM_SWITCH1_PIN, HIGH);
+            digWrite(DM_SWITCH2_PIN, HIGH);
         }
         //
         // update JOYX, JOYY, SPEEDKNOB
         // involves sending three bytes to SPI bus for AD5206 Digital Pot
         // pot 1 (Joystick X)
-        SPI_send(JOY_X_POT, state.joyx);
+        SPI_sendPots(JOY_X_POT, state.joyx);
         // pot 2 (joystick Y)
-        SPI_send(JOY_Y_POT, state.joyy);
+        SPI_sendPots(JOY_Y_POT, state.joyy);
         // pot 3 (Speed Knob)
-        SPI_send(SPEED_POT, state.speedknob_real);
+        SPI_sendPots(SPEED_POT, state.speedknob_real);
     }
 }
 
