@@ -254,7 +254,14 @@ void loop()
     static bool led=true;
     setDrivemode(DRIVEMODE_OFF);
     while (1) {
+        while (UART_available()) {
+            UART_char(' ');
+            uint8_t in=UART_getchar();
+            UART_signed(in,16);
+            UART_char(' ');
+        }
         UART_char(led+48);
+        UART_char(8);
         setLED(led?LED0|LED1:LED1);
         led=!led;
         delay(2000);
