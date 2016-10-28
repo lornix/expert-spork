@@ -5,6 +5,7 @@
  */
 
 #include "motion-control.h"
+#include "uart_support.h"
 
 void inline setLED(uint8_t mask)
 {
@@ -273,7 +274,7 @@ ISR(TIMER0_COMPA_vect)
 void setup()
 {
     // slow and reliable
-    Serial.begin(9600);
+    init_UART(9600);
 
     // set timer0 interrupt for 1024 ticks/sec
     Init_Timer0Interrupt();
@@ -288,13 +289,10 @@ void setup()
 void loop()
 {
     static bool led=true;
-    setDrivemode(DRIVEMODE_ONE);
-    delay(2000);
-    setDrivemode(DRIVEMODE_TWO);
-    delay(2000);
     setDrivemode(DRIVEMODE_OFF);
     while (1) {
-        setLED(led?LED0:ALL_OFF);
+        UART_char(led+48);
+        setLED(led?LED0|LED1:LED1);
         led=!led;
         delay(2000);
     }
