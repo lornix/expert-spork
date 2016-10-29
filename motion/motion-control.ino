@@ -25,7 +25,7 @@ void static inline setDrivemode(uint8_t mode)
         mode = DRIVEMODE_OFF;
     }
     state.drivemode = mode;
-    if (mode!=DRIVEMODE_OFF) {
+    if (mode != DRIVEMODE_OFF) {
         // give time for control module to start
         delay(DRIVEMODE_DELAY_MS);
     }
@@ -58,10 +58,10 @@ void static inline setJoy(int8_t xpos, int8_t ypos)
 
 void static setAnglePush(int16_t angle, uint8_t push)
 {
-    if ((ABS16(angle)>180)||(push>JOY_PUSH_MAX)) {
+    if ((ABS16(angle) > 180) || (push > JOY_PUSH_MAX)) {
         // out of range? zero!
-        angle=0;
-        push=0;
+        angle = 0;
+        push = 0;
     }
     //
     // convert to radians
@@ -73,32 +73,37 @@ void static setAnglePush(int16_t angle, uint8_t push)
     // int16_t x=sin(angleRads)*force;
     // int16_t y=cos(angleRads)*force;
 
-    int16_t force=(JOY_DELTA_MAX*push)/JOY_PUSH_MAX;
+    int16_t force = (JOY_DELTA_MAX * push) / JOY_PUSH_MAX;
     int16_t force7 = (force * 7) / 10;
 
-    int16_t x=0;
-    int16_t y=0;
+    int16_t x = 0;
+    int16_t y = 0;
 
-    int16_t absangle=ABS16(angle);
+    int16_t absangle = ABS16(angle);
 
     // decode 8 directions (4 here, then flipped across Y-axis)
-    if (absangle<23) { // 0
-        x=0; y=force;
-    } else if ((absangle>22)&&(absangle<68)) { // 45
-        x=force7; y=force7;
-    } else if ((absangle>67)&&(absangle<113)) { // 90
-        x=force; y=0;
-    } else if ((absangle>112)&&(absangle<158)) { // 135
-        x=force7; y=-force7;
-    } else { // 180
-        x=0; y=-force;
+    if (absangle < 23) {        // 0
+        x = 0;
+        y = force;
+    } else if ((absangle > 22) && (absangle < 68)) {    // 45
+        x = force7;
+        y = force7;
+    } else if ((absangle > 67) && (absangle < 113)) {   // 90
+        x = force;
+        y = 0;
+    } else if ((absangle > 112) && (absangle < 158)) {  // 135
+        x = force7;
+        y = -force7;
+    } else {                    // 180
+        x = 0;
+        y = -force;
     }
     //
     // flip across Y-axis if angle negative
-    if (angle<0) {
-        x=-x;
+    if (angle < 0) {
+        x = -x;
     }
-    setJoy(x,y);
+    setJoy(x, y);
 }
 
 void static Init_Timer0Interrupt()
@@ -141,7 +146,7 @@ void static initDefaultState()
     // setJoy(0, 0);
     //
     // set angle / push to 0's initially
-    setAnglePush(0,0);
+    setAnglePush(0, 0);
 }
 
 // Interrupt ticks at 1024Hz
@@ -163,7 +168,7 @@ ISR(TIMER0_COMPA_vect)
     }
     //
     // only update LED's every 16th tick (64Hz)
-    if ((ISRtick & 0x0f) == 5 ) {
+    if ((ISRtick & 0x0f) == 5) {
         // offset by 5 ticks so LEDs and SPI
         // don't occur same tick
         //
@@ -251,21 +256,21 @@ void setup()
 
 void loop()
 {
-    static bool led=true;
+    static bool led = true;
     setDrivemode(DRIVEMODE_ONE);
     delay(3000);
     setDrivemode(DRIVEMODE_OFF);
     while (1) {
         while (UART_available()) {
             UART_char(' ');
-            uint8_t in=UART_getchar();
-            UART_signed(in,16);
+            uint8_t in = UART_getchar();
+            UART_signed(in, 16);
             UART_char(' ');
         }
-        UART_char(led+48);
+        UART_char(led + 48);
         UART_char(8);
-        setLED(led?LED0|LED1:LED1);
-        led=!led;
+        setLED(led ? LED0 | LED1 : LED1);
+        led = !led;
         delay(2000);
     }
 }
