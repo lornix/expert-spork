@@ -252,6 +252,8 @@ void setup()
 void loop()
 {
     static bool led=true;
+    setDrivemode(DRIVEMODE_ONE);
+    delay(3000);
     setDrivemode(DRIVEMODE_OFF);
     while (1) {
         while (UART_available()) {
