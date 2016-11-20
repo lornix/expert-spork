@@ -49,6 +49,14 @@ void static inline setJoy(int8_t xpos, int8_t ypos)
         xpos = 0;
         ypos = 0;
     }
+
+    UART_string((char*)"setJoy(");
+    UART_signed(xpos,10);
+    UART_string((char*)",");
+    UART_signed(ypos,10);
+    UART_string((char*)")");
+    UART_crlf();
+
     // -xpos is left, +xpos is right
     state.joyx = JOY_STOP + xpos;
     // flip sign of fwd/bkw signal
@@ -147,6 +155,9 @@ void static initDefaultState()
     //
     // set angle / push to 0's initially
     setAnglePush(0, 0);
+    // long pause to allow interrupt routine
+    // to update hardware
+    delay(1000);
 }
 
 // Interrupt ticks at 1024Hz
@@ -252,25 +263,15 @@ void setup()
 
     // initial state setup
     initDefaultState();
+
+    // initial start delay
+    delay(3000);
 }
 
 void loop()
 {
-    static bool led = true;
     setDrivemode(DRIVEMODE_ONE);
-    delay(3000);
-    setDrivemode(DRIVEMODE_OFF);
+    setJoy(0,0);
     while (1) {
-        while (UART_available()) {
-            UART_char(' ');
-            uint8_t in = UART_getchar();
-            UART_signed(in, 16);
-            UART_char(' ');
-        }
-        UART_char(led + 48);
-        UART_char(8);
-        setLED(led ? LED0 | LED1 : LED1);
-        led = !led;
-        delay(2000);
     }
 }
