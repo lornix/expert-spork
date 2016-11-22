@@ -19,8 +19,6 @@ void i2c_scanner(void)
 {
     byte error, address;
     int nDevices=0;
-    // delay to let serial monitor connection
-    delay(2000);
     Wire.begin();
     for (address = 0; address < 127; address++) {
         // The i2c_scanner uses the return value of
@@ -52,7 +50,7 @@ void i2c_scanner(void)
 void setup()
 {
     Serial.begin(115200);
-    // i2c_scanner();
+    i2c_scanner();
     Wire.begin(); // master
     delay(1);
     Wire.beginTransmission(0x52);
@@ -98,7 +96,7 @@ void putval(int val, int pos)
 void loop()
 {
     byte cnt;
-    byte buf[6];
+    int buf[6];
     while (1) {
         cnt=0;
         send_zero();
@@ -106,13 +104,24 @@ void loop()
         while (Wire.available()) {
             buf[cnt++]=Wire.read();
         }
-        putval(buf[0]-128, 2);
-        putval(buf[1]-128, 7);
-        putval(buf[2]-128,16);
-        putval(buf[3]-128,25);
-        putval(buf[4]-128,34);
+        // make everything zero based, -127 -> 127
+        buf[0]-=128;
+        buf[1]-=128;
+        buf[2]-=128;
+        buf[3]-=128;
+        buf[4]-=128;
+        // scale joystick from -127->127 to -10->10
+        buf[0]=(abs(buf[0])/13)*((buf[0]<0)?-1:1);
+        buf[1]=(abs(buf[1])/13)*((buf[1]<0)?-1:1);
+        // build string
+        putval(buf[0], 2);
+        putval(buf[1], 7);
+        putval(buf[2],16);
+        putval(buf[3],25);
+        putval(buf[4],34);
         putval((buf[5]&2)==0,43);
         putval((buf[5]&1)==0,52);
         Serial.print(str);
+        delay(100);
     }
 }
